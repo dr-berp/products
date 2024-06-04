@@ -40,7 +40,14 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   }
 
   async findOne(id: number) {
-    const product = await this.product.findFirst({ where: { id, enabled: true } });
+    const product = await this.product.findFirst({
+      where: { id, enabled: true },
+      include: {
+        codes: {
+          select: { code: true },
+        },
+      },
+    });
 
     if (!product)
       throw new RpcException({
@@ -80,6 +87,23 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
         message: `Product with id ${id} is already enabled`,
       });
 
-    return this.product.update({ where: { id }, data: { enabled: true } });
+    return this.product.update({ where: { id }, data: { enabled: true, deletedAt: new Date() } });
+  }
+
+  async validate(ids: number[]) {
+    ids = Array.from(new Set(ids));
+
+    const products = await this.product.findMany({ where: { id: { in: ids } } });
+
+    if (products.length !== ids.length) {
+      const notFound = ids.filter((id) => !products.some((product) => product.id === id));
+
+      throw new RpcException({
+        status: HttpStatus.NOT_FOUND,
+        message: `Products with ids ${notFound.join(', ')} not found`,
+      });
+    }
+
+    return products;
   }
 }

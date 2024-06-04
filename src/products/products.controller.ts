@@ -2,7 +2,7 @@ import { Controller, ParseIntPipe } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import { PaginationDto } from 'src/common';
-import { CreateProductDto, UpdateProductDto } from './dto';
+import { CreateProductDto, UpdateProductDto, ValidateProductDto as ValidateProductsDto } from './dto';
 import { ProductsService } from './products.service';
 
 @Controller()
@@ -42,5 +42,10 @@ export class ProductsController {
   @MessagePattern('product.restore')
   restore(@Payload('id', ParseIntPipe) id: number) {
     return this.productsService.restore(id);
+  }
+
+  @MessagePattern('product.validate')
+  validate(@Payload() validateProductsDto: ValidateProductsDto) {
+    return this.productsService.validate(validateProductsDto.ids);
   }
 }

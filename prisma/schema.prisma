@@ -14,7 +14,31 @@ datasource db {
 }
 
 model Product {
-  id      Int     @id @default(autoincrement())
-  name    String
-  enabled Boolean @default(true)
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String?
+  codes       ProductCode[]
+
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@map("products")
+}
+
+model ProductCode {
+  id        Int     @id @default(autoincrement())
+  code      Int     @unique
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+
+  enabled   Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([productId])
+  @@index([code])
+  @@map("product_codes")
 }
