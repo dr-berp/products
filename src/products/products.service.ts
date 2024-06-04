@@ -8,7 +8,7 @@ import { PaginationDto } from 'src/common';
 
 @Injectable()
 export class ProductsService extends PrismaClient implements OnModuleInit {
-  private readonly logger = new Logger(ProductsService.name);
+  private readonly logger = new Logger('ProductsService');
 
   constructor(@Inject(NATS_SERVICE) private readonly client: ClientProxy) {
     super();
@@ -44,6 +44,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
       where: { id, enabled: true },
       include: {
         codes: {
+          where: { enabled: true },
           select: { code: true },
         },
       },
