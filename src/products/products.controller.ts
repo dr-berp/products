@@ -1,7 +1,7 @@
 import { Controller, ParseIntPipe } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
-import { PaginationDto } from 'src/common';
+import { PaginationDto, User } from 'src/common';
 import { CreateProductDto, UpdateProductDto, ValidateProductDto as ValidateProductsDto } from './dto';
 import { ProductsService } from './products.service';
 
@@ -20,8 +20,10 @@ export class ProductsController {
   }
 
   @MessagePattern('product.findAll')
-  findAll(@Payload() paginationDto: PaginationDto) {
-    return this.productsService.findAll(paginationDto);
+  findAll(@Payload() payload: { paginationDto: PaginationDto; user: User }) {
+    const { paginationDto, user } = payload;
+
+    return this.productsService.findAll(paginationDto, user);
   }
 
   @MessagePattern('product.findOne')

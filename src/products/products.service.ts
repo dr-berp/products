@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { NATS_SERVICE } from 'src/config';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { PaginationDto } from 'src/common';
+import { PaginationDto, User } from 'src/common';
 
 @Injectable()
 export class ProductsService extends PrismaClient implements OnModuleInit {
@@ -23,19 +23,22 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     return this.product.create({ data: createProductDto });
   }
 
-  async findAll(paginationDto: PaginationDto) {
+  async findAll(paginationDto: PaginationDto, user: User) {
     const { page, limit } = paginationDto;
 
-    const total = await this.product.count({ where: { enabled: true } });
+    const where = user.isAdmin ? {} : { enabled: true };
+    const total = await this.product.count({ where });
     const lastPage = Math.ceil(total / limit);
+
+    const data = await this.product.findMany({
+      take: limit,
+      skip: (page - 1) * limit,
+      where,
+    });
 
     return {
       meta: { total, page, lastPage },
-      data: await this.product.findMany({
-        take: limit,
-        skip: (page - 1) * limit,
-        where: { enabled: true },
-      }),
+      data,
     };
   }
 
