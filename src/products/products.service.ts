@@ -1,10 +1,10 @@
 import { HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { PrismaClient } from '@prisma/client';
+import { PaginationDto } from 'src/common';
 import { NATS_SERVICE } from 'src/config';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { PaginationDto, User } from 'src/common';
 
 @Injectable()
 export class ProductsService extends PrismaClient implements OnModuleInit {
@@ -23,10 +23,10 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     return this.product.create({ data: createProductDto });
   }
 
-  async findAll(paginationDto: PaginationDto, user: User) {
+  async findAll(paginationDto: PaginationDto) {
     const { page, limit } = paginationDto;
 
-    const where = user.isAdmin ? {} : { enabled: true };
+    const where = true ? {} : { enabled: true };
     const total = await this.product.count({ where });
     const lastPage = Math.ceil(total / limit);
 
@@ -73,7 +73,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   async remove(id: number) {
     await this.findOne(id);
 
-    return this.product.update({ where: { id }, data: { enabled: false } });
+    return this.product.update({ where: { id }, data: { enabled: false, deletedAt: new Date() } });
   }
 
   async restore(id: number) {
@@ -91,7 +91,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
         message: `Product with id ${id} is already enabled`,
       });
 
-    return this.product.update({ where: { id }, data: { enabled: true, deletedAt: new Date() } });
+    return this.product.update({ where: { id }, data: { enabled: true, deletedAt: null } });
   }
 
   async validate(ids: number[]) {
