@@ -2,7 +2,7 @@ import { HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/co
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { PrismaClient } from '@prisma/client';
 import { CreateProductCodeDto, UpdateProductCodeDto } from './dto';
-import { PaginationDto } from 'src/common';
+import { PaginationDto, User } from 'src/common';
 
 @Injectable()
 export class ProductCodesService extends PrismaClient implements OnModuleInit {
@@ -17,11 +17,12 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
     this.logger.log('Connected to the database \\(^.^)/');
   }
 
-  async create(createProductCodeDto: CreateProductCodeDto) {
+  async create(createProductCodeDto: CreateProductCodeDto, user: User) {
     try {
       const productCode = await this.productCode.create({
         data: {
           code: await this.getLastProductCode(),
+          createdById: user.id,
           product: {
             connect: {
               id: createProductCodeDto.productId,
@@ -43,7 +44,7 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
   async findAll(paginationDto: PaginationDto) {
     const { page, limit } = paginationDto;
 
-    const total = await this.productCode.count({ where: { enabled: true } });
+    const total = await this.productCode.count({ where: { deletedAt: null } });
     const lastPage = Math.ceil(total / limit);
 
     return {
@@ -51,7 +52,7 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
       data: await this.productCode.findMany({
         take: limit,
         skip: (page - 1) * limit,
-        where: { enabled: true },
+        where: { deletedAt: null },
         include: {
           product: {
             select: {
@@ -67,7 +68,7 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
 
   async findOne(id: number) {
     const productCode = await this.productCode.findFirst({
-      where: { id, enabled: true },
+      where: { id, deletedAt: null },
     });
 
     if (!productCode)
@@ -94,7 +95,7 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
 
     return this.productCode.update({
       where: { id },
-      data: { enabled: false, deletedAt: new Date() },
+      data: { deletedAt: new Date() },
     });
   }
 
@@ -109,7 +110,7 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
 
     return this.productCode.update({
       where: { id },
-      data: { enabled: true, deletedAt: null },
+      data: { deletedAt: null },
     });
   }
 

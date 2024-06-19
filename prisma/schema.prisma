@@ -19,10 +19,12 @@ model Product {
   description String?
   codes       ProductCode[]
 
-  enabled   Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  createdById String
+  updatedById String?
 
   @@map("products")
 }
@@ -33,10 +35,12 @@ model ProductCode {
   productId Int
   product   Product @relation(fields: [productId], references: [id])
 
-  enabled   Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  updatedById String?
+  createdById String
 
   @@index([productId])
   @@index([code])

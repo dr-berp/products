@@ -1,10 +1,12 @@
 import { HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { PrismaClient } from '@prisma/client';
-import { PaginationDto } from 'src/common';
+import { PaginationDto, User } from 'src/common';
 import { NATS_SERVICE } from 'src/config';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ObjectManipulator } from 'src/common/helpers';
+import { catchError, firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class ProductsService extends PrismaClient implements OnModuleInit {
@@ -19,14 +21,14 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     this.logger.log('Connected to the database \\(^.^)/');
   }
 
-  async create(createProductDto: CreateProductDto) {
-    return this.product.create({ data: createProductDto });
+  async create(createProductDto: CreateProductDto, user: User) {
+    return this.product.create({ data: { ...createProductDto, createdById: user.id } });
   }
 
   async findAll(paginationDto: PaginationDto) {
     const { page, limit } = paginationDto;
 
-    const where = true ? {} : { enabled: true };
+    const where = true ? {} : { deletedAt: null };
     const total = await this.product.count({ where });
     const lastPage = Math.ceil(total / limit);
 
@@ -44,10 +46,10 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
 
   async findOne(id: number) {
     const product = await this.product.findFirst({
-      where: { id, enabled: true },
+      where: { id, deletedAt: null },
       include: {
         codes: {
-          where: { enabled: true },
+          where: { deletedAt: null },
           select: { code: true },
         },
       },
@@ -58,8 +60,19 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
         status: HttpStatus.NOT_FOUND,
         message: `Product with id ${id} not found`,
       });
+    const createdById = product.createdById;
+    ObjectManipulator.safeDelete(product, 'createdById');
 
-    return product;
+    // get the user who created the product using nats
+    const createdBy = await firstValueFrom(this.client.send('users.find.id.summary', { id: createdById }));
+
+    if (createdBy === null)
+      throw new RpcException({
+        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        message: `User with id ${createdById} not found`,
+      });
+
+    return { ...product, createdBy };
   }
 
   async update(updateProductDto: UpdateProductDto) {
@@ -73,7 +86,7 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
   async remove(id: number) {
     await this.findOne(id);
 
-    return this.product.update({ where: { id }, data: { enabled: false, deletedAt: new Date() } });
+    return this.product.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   async restore(id: number) {
@@ -85,13 +98,13 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
         message: `Product with id ${id} not found`,
       });
 
-    if (product.enabled)
+    if (product.deletedAt === null)
       throw new RpcException({
         status: HttpStatus.CONFLICT,
         message: `Product with id ${id} is already enabled`,
       });
 
-    return this.product.update({ where: { id }, data: { enabled: true, deletedAt: null } });
+    return this.product.update({ where: { id }, data: { deletedAt: null } });
   }
 
   async validate(ids: number[]) {

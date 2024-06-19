@@ -11,44 +11,12 @@ const main = async () => {
     data: {
       name: 'Product 1',
       description: 'Description 1',
-      enabled: true,
+      createdById: '5ff41c62-7d96-4111-a21c-6e2c57bbe55f',
       codes: {
         createMany: {
           data: [
-            { code: 1, enabled: true },
-            { code: 2, enabled: true },
-          ],
-        },
-      },
-    },
-  });
-
-  await prisma.product.create({
-    data: {
-      name: 'Product 2',
-      description: 'Description 2',
-      enabled: true,
-      codes: {
-        createMany: {
-          data: [
-            { code: 3, enabled: true },
-            { code: 4, enabled: true },
-          ],
-        },
-      },
-    },
-  });
-
-  await prisma.product.create({
-    data: {
-      name: 'Product 3',
-      description: 'Description 3',
-      enabled: true,
-      codes: {
-        createMany: {
-          data: [
-            { code: 5, enabled: true },
-            { code: 6, enabled: true },
+            { code: 1, createdById: '5ff41c62-7d96-4111-a21c-6e2c57bbe55f' },
+            { code: 2, createdById: '5ff41c62-7d96-4111-a21c-6e2c57bbe55f' },
           ],
         },
       },
