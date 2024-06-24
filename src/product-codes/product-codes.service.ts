@@ -1,8 +1,10 @@
 import { HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { PrismaClient } from '@prisma/client';
-import { CreateProductCodeDto, UpdateProductCodeDto } from './dto';
 import { PaginationDto, User } from 'src/common';
+import { ObjectManipulator } from 'src/common/helpers';
+import { CreateProductCodeDto, UpdateProductCodeDto } from './dto';
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class ProductCodesService extends PrismaClient implements OnModuleInit {
@@ -71,23 +73,27 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
       where: { id, deletedAt: null },
     });
 
-    if (!productCode)
-      throw new RpcException({
-        status: HttpStatus.NOT_FOUND,
-        message: `Product Code with id ${id} not found`,
-      });
+    if (!productCode) throw new RpcException({ status: HttpStatus.NOT_FOUND, message: `Product Code with id ${id} not found` });
 
-    return productCode;
+    const { createdById, updatedById } = productCode;
+    ObjectManipulator.safeDelete(productCode, 'createdById');
+    ObjectManipulator.safeDelete(productCode, 'updatedById');
+
+    const [createdBy, updatedBy] = await Promise.all([
+      firstValueFrom(this.client.send('users.find.id.summary', { id: createdById })),
+      firstValueFrom(this.client.send('users.find.id.summary', { id: updatedById })),
+    ]);
+
+    if (!createdBy) throw new RpcException({ status: HttpStatus.INTERNAL_SERVER_ERROR, message: `User with id ${createdById} not found` });
+
+    return { ...productCode, createdBy, updatedBy };
   }
 
-  async update(updateProductCodeDto: UpdateProductCodeDto) {
+  async update(updateProductCodeDto: UpdateProductCodeDto, user: User) {
     const { id, ...data } = updateProductCodeDto;
     await this.findOne(id);
 
-    return this.productCode.update({
-      where: { id },
-      data,
-    });
+    return this.productCode.update({ where: { id }, data: { ...data, updatedById: user.id } });
   }
 
   async remove(id: number) {
@@ -102,11 +108,10 @@ export class ProductCodesService extends PrismaClient implements OnModuleInit {
   async restore(id: number) {
     const productCode = await this.productCode.findFirst({ where: { id } });
 
-    if (!productCode)
-      throw new RpcException({
-        status: HttpStatus.NOT_FOUND,
-        message: `Product Code with id ${id} not found`,
-      });
+    if (!productCode) throw new RpcException({ status: HttpStatus.NOT_FOUND, message: `Product Code with id ${id} not found` });
+
+    if (productCode.deletedAt === null)
+      throw new RpcException({ status: HttpStatus.BAD_REQUEST, message: `Product Code with id ${id} is not deleted` });
 
     return this.productCode.update({
       where: { id },

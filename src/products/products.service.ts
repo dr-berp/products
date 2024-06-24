@@ -1,12 +1,12 @@
 import { HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { PrismaClient } from '@prisma/client';
+import { firstValueFrom } from 'rxjs';
 import { PaginationDto, User } from 'src/common';
+import { ObjectManipulator } from 'src/common/helpers';
 import { NATS_SERVICE } from 'src/config';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { ObjectManipulator } from 'src/common/helpers';
-import { catchError, firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class ProductsService extends PrismaClient implements OnModuleInit {
@@ -48,39 +48,38 @@ export class ProductsService extends PrismaClient implements OnModuleInit {
     const product = await this.product.findFirst({
       where: { id, deletedAt: null },
       include: {
-        codes: {
-          where: { deletedAt: null },
-          select: { code: true },
-        },
+        codes: { where: { deletedAt: null }, select: { code: true } },
       },
     });
 
-    if (!product)
-      throw new RpcException({
-        status: HttpStatus.NOT_FOUND,
-        message: `Product with id ${id} not found`,
-      });
-    const createdById = product.createdById;
+    if (!product) throw new RpcException({ status: HttpStatus.NOT_FOUND, message: `Product with id ${id} not found` });
+
+    const { createdById, updatedById } = product;
     ObjectManipulator.safeDelete(product, 'createdById');
+    ObjectManipulator.safeDelete(product, 'updatedById');
 
-    // get the user who created the product using nats
-    const createdBy = await firstValueFrom(this.client.send('users.find.id.summary', { id: createdById }));
+    const [createdBy, updatedBy] = await Promise.all([
+      firstValueFrom(this.client.send('users.find.id.summary', { id: createdById })),
+      firstValueFrom(this.client.send('users.find.id.summary', { id: updatedById })),
+    ]);
 
-    if (createdBy === null)
-      throw new RpcException({
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-        message: `User with id ${createdById} not found`,
-      });
+    if (!createdBy) throw new RpcException({ status: HttpStatus.INTERNAL_SERVER_ERROR, message: `User with id ${createdById} not found` });
 
-    return { ...product, createdBy };
+    return { ...product, createdBy, updatedBy };
   }
 
-  async update(updateProductDto: UpdateProductDto) {
+  async update(updateProductDto: UpdateProductDto, user: User) {
     const { id, ...data } = updateProductDto;
 
     await this.findOne(id);
 
-    return this.product.update({ where: { id }, data });
+    return this.product.update({
+      where: { id },
+      data: {
+        ...data,
+        updatedById: user.id,
+      },
+    });
   }
 
   async remove(id: number) {

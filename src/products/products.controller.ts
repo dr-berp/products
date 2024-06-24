@@ -33,8 +33,9 @@ export class ProductsController {
   }
 
   @MessagePattern('product.update')
-  update(@Payload() updateProductDto: UpdateProductDto) {
-    return this.productsService.update(updateProductDto);
+  update(@Payload() payload: { updateProductDto: UpdateProductDto; user: User }) {
+    const { updateProductDto, user } = payload;
+    return this.productsService.update(updateProductDto, user);
   }
 
   @MessagePattern('product.remove')

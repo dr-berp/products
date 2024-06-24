@@ -30,8 +30,9 @@ export class ProductCodesController {
   }
 
   @MessagePattern('product.code.update')
-  update(@Payload() updateProductCodeDto: UpdateProductCodeDto) {
-    return this.productCodesService.update(updateProductCodeDto);
+  update(@Payload() payload: { updateProductCodeDto: UpdateProductCodeDto; user: User }) {
+    const { updateProductCodeDto, user } = payload;
+    return this.productCodesService.update(updateProductCodeDto, user);
   }
 
   @MessagePattern('product.code.remove')
